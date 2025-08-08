@@ -1,0 +1,1120 @@
+{
+	"info": {
+		"_postman_id": "d9b82906-c71d-4459-9182-51190911c6b9",
+		"name": "Tests",
+		"description": "Тестирование GET /restapi/v2/organizations/{organization_id}/optimizations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "27279486"
+	},
+	"item": [
+		{
+			"name": "Positive Tests",
+			"item": [
+				{
+					"name": "01_Valid Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"//1 Базовый ответ от сервиса",
+									"pm.test(\"Status code is 200\", () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has valid JSON body\", () => {",
+									"    pm.response.to.have.jsonBody();",
+									"});",
+									"",
+									"//2 Валидная структура",
+									"pm.test(\"Response contains required top-level fields\", () => {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.all.keys(",
+									"        'total_saving',",
+									"        'optimizations',",
+									"        'dismissed_optimizations',",
+									"        'excluded_optimizations',",
+									"        'deleted_at',",
+									"        'id',",
+									"        'created_at',",
+									"        'organization_id',",
+									"        'last_run',",
+									"        'next_run',",
+									"        'last_completed'",
+									"    );",
+									"});",
+									"",
+									"//3 Проверяем тип поля",
+									"pm.test(\"Field type validation\", () => {",
+									"    const jsonData = pm.response.json();",
+									"    ",
+									"    // Топ поля",
+									"    pm.expect(jsonData.total_saving).to.be.a('number');",
+									"    pm.expect(jsonData.optimizations).to.be.an('object');",
+									"    pm.expect(jsonData.dismissed_optimizations).to.be.an('object');",
+									"    pm.expect(jsonData.excluded_optimizations).to.be.an('object');",
+									"    ",
+									"    // Мета поля",
+									"    pm.expect(jsonData.id).to.be.a('string');",
+									"    pm.expect(jsonData.created_at).to.be.a('number');",
+									"    pm.expect(jsonData.organization_id).to.be.a('string');",
+									"    pm.expect(jsonData.last_run).to.be.a('number');",
+									"    pm.expect(jsonData.next_run).to.be.a('number');",
+									"    pm.expect(jsonData.last_completed).to.be.a('number');",
+									"});",
+									"",
+									"//4 Проверяем оптимизацию",
+									"pm.test(\"Optimizations structure validation\", () => {",
+									"    const optimizations = pm.response.json().optimizations;",
+									"    ",
+									"    for (const [key, value] of Object.entries(optimizations)) {",
+									"        // Посчитаны все оптимизации",
+									"        pm.expect(value).to.have.property('count').that.is.a('number').and.at.least(0);",
+									"        ",
+									"        // Большинство оптимизаций имеют сохраненность ? (за исключением определенных типов)",
+									"        if (!['inactive_console_users', 'inactive_users', 'insecure_security_groups', 's3_public_buckets'].includes(key)) {",
+									"            pm.expect(value).to.have.property('saving').that.is.a('number').and.at.least(0);",
+									"        }",
+									"        ",
+									"        // Проверяем поле ошибки",
+									"        if (value.error) {",
+									"            pm.expect(value.error).to.be.a('string');",
+									"        }",
+									"    }",
+									"});",
+									"",
+									"//5 Проверка отклоненных/исключенных оптимизаций",
+									"pm.test(\"Dismissed optimizations validation\", () => {",
+									"    const dismissed = pm.response.json().dismissed_optimizations;",
+									"    ",
+									"    for (const [key, value] of Object.entries(dismissed)) {",
+									"        pm.expect(value).to.have.property('count').that.is.a('number').and.at.least(0);",
+									"        pm.expect(value).to.have.property('saving').that.is.a('number').and.at.least(0);",
+									"    }",
+									"});",
+									"",
+									"pm.test(\"Excluded optimizations validation\", () => {",
+									"    const excluded = pm.response.json().excluded_optimizations;",
+									"    ",
+									"    for (const [key, value] of Object.entries(excluded)) {",
+									"        pm.expect(value).to.have.property('count').that.is.a('number').and.at.least(0);",
+									"        pm.expect(value).to.have.property('saving').that.is.a('number').and.at.least(0);",
+									"    }",
+									"});",
+									"",
+									"//6 Проверяем временную метку",
+									"pm.test(\"Timestamp validation\", () => {",
+									"    const jsonData = pm.response.json();",
+									"    const now = Math.floor(Date.now() / 1000);",
+									"    ",
+									"    pm.expect(jsonData.created_at).to.be.a('number').and.below(now);",
+									"    pm.expect(jsonData.last_run).to.be.a('number').and.below(now);",
+									"    pm.expect(jsonData.last_completed).to.be.a('number').and.below(now);",
+									"    pm.expect(jsonData.next_run).to.be.a('number').and.above(jsonData.last_run);",
+									"});",
+									"",
+									"//7 Проверка идентификатора организации",
+									"pm.test(\"Organization ID matches request\", () => {",
+									"    const jsonData = pm.response.json();",
+									"    const requestedOrgId = pm.variables.get(\"organization_id\");",
+									"    pm.expect(jsonData.organization_id).to.equal(requestedOrgId);",
+									"});",
+									"",
+									"//8 Проверяем общую сумму",
+									"pm.test(\"Total saving matches sum of optimizations\", () => {",
+									"    const jsonData = pm.response.json();",
+									"    let calculatedTotal = 0;",
+									"    ",
+									"    // Общая сумма",
+									"    for (const value of Object.values(jsonData.optimizations)) {",
+									"        if (value.saving) {",
+									"            calculatedTotal += value.saving;",
+									"        }",
+									"    }",
+									"    ",
+									"    // Допускаем небольшую разницу в числах с плавающей точкой",
+									"    pm.expect(jsonData.total_saving).to.be.closeTo(calculatedTotal, 0.001);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "02_Overview=true",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"//1 Проверить, что статус ответа 200 OK",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"//2 Проверить, что ответ в формате JSON",
+									"pm.test(\"Content-Type is application/json\", function () {",
+									"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+									"});",
+									"",
+									"//3 Проверить, что тело ответа - это JSON объект",
+									"pm.test(\"Response body is a JSON object\", function () {",
+									"    pm.expect(pm.response.json()).to.be.an('object');",
+									"});",
+									"",
+									"//4 Проверка структуры элемента в разделе item",
+									"pm.test(\"Structure of first abandoned instance item\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    const items = jsonData.optimizations.abandoned_instances.items;",
+									"",
+									"    if (items && items.length > 0) {",
+									"        const firstItem = items[0];",
+									"        pm.expect(firstItem).to.be.an('object');",
+									"        pm.expect(firstItem).to.have.property('cloud_resource_id').that.is.a('string'); // или null",
+									"        pm.expect(firstItem).to.have.property('resource_name').that.is.a('string'); // или null",
+									"        pm.expect(firstItem).to.have.property('resource_id').that.satisfies((id) => id === null || typeof id === 'string');",
+									"        pm.expect(firstItem).to.have.property('cloud_account_id').that.is.a('string');",
+									"        pm.expect(firstItem).to.have.property('cloud_type').that.is.a('string');",
+									"        pm.expect(firstItem).to.have.property('cloud_account_name').that.is.a('string');",
+									"        pm.expect(firstItem).to.have.property('region').that.satisfies((r) => r === null || typeof r === 'string');",
+									"         // saving обычно присутствует и является числом",
+									"        pm.expect(firstItem).to.have.property('saving').that.is.a('number');",
+									"        pm.expect(firstItem).to.have.property('detected_at').that.is.a('number');",
+									"        // Проверить другие возможные поля в зависимости от типа ресурса (last_used, snapshots, is_excluded и т.д.)",
+									"    } else {",
+									"        // Можно добавить проверку, что count == 0 или items == null",
+									"        pm.expect(jsonData.abandoned_instances.count).to.eql(0);",
+									"    }",
+									"});",
+									"",
+									"//5 Проверка согласованности данных",
+									"pm.test(\"Consistency of abandoned instances count and items length\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    const section = jsonData.optimizations.abandoned_instances;",
+									"",
+									"    if (section.items) { // Проверить только если items не null",
+									"        pm.expect(section.count).to.eql(section.items.length);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?overview=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "overview",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "03_Valid Status + Limit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"All optimizations have status 'excluded'\", () => {",
+									"    response.optimizations.forEach(opt => {",
+									"        pm.expect(opt.status).to.equal(\"excluded\");",
+									"    });",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?type={{valid_type}}&status={{valid_status}}&limit=2",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "{{valid_type}}"
+								},
+								{
+									"key": "status",
+									"value": "{{valid_status}}"
+								},
+								{
+									"key": "limit",
+									"value": "2"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "04_Valid Cloud Account Filter",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 200\", () => pm.response.to.have.status(200));\r",
+									"\r",
+									"pm.test(\"Все оптимизации относятся к указанному cloud_account_id\", () => {\r",
+									"    const response = pm.response.json();\r",
+									"    const valid_account_id = pm.environment.get(\"valid_account_id\");\r",
+									"    \r",
+									"    // Проверяем, что valid_account_id установлен\r",
+									"    pm.expect(valid_account_id).to.exist.and.to.be.a('string');\r",
+									"    \r",
+									"    // Функция для проверки оптимизаций в указанном разделе\r",
+									"    function validateOptimizations(optimizationsSection) {\r",
+									"        for (const [type, optimization] of Object.entries(optimizationsSection)) {\r",
+									"            // Пропускаем, если нет элементов\r",
+									"            if (!optimization.items || optimization.items.length === 0) continue;\r",
+									"            \r",
+									"            // Проверяем каждый элемент\r",
+									"            for (const item of optimization.items) {\r",
+									"                // Для некоторых типов оптимизаций cloud_account_id может быть вложенным\r",
+									"                const itemCloudAccountId = item.cloud_account_id || \r",
+									"                                         (item.resource && item.resource.cloud_account_id);\r",
+									"                \r",
+									"                pm.expect(itemCloudAccountId, \r",
+									"                         `Оптимизация типа '${type}' имеет неверный cloud_account_id`)\r",
+									"                    .to.equal(valid_account_id);\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									"    \r",
+									"    // Проверяем все разделы оптимизаций\r",
+									"    if (response.optimizations) {\r",
+									"        validateOptimizations(response.optimizations);\r",
+									"    }\r",
+									"    \r",
+									"    if (response.dismissed_optimizations) {\r",
+									"        validateOptimizations(response.dismissed_optimizations);\r",
+									"    }\r",
+									"    \r",
+									"    if (response.excluded_optimizations) {\r",
+									"        validateOptimizations(response.excluded_optimizations);\r",
+									"    }\r",
+									"    \r",
+									"    // Дополнительная проверка: cloud_accounts на верхнем уровне\r",
+									"    if (response.cloud_accounts && response.cloud_accounts.length > 0) {\r",
+									"        const accountIds = response.cloud_accounts.map(acc => acc.id);\r",
+									"        pm.expect(accountIds).to.include(valid_account_id);\r",
+									"    }\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?cloud_account_id={{valid_account_id}}&overview=true",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "cloud_account_id",
+									"value": "{{valid_account_id}}"
+								},
+								{
+									"key": "overview",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Negative Tests",
+			"item": [
+				{
+					"name": "05_Invalid organization_id (non-UUID)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 404\", () => pm.response.to.have.status(404));",
+									"",
+									"pm.test(\"Структура ошибки корректна\", () => {",
+									"    const response = pm.response.json();",
+									"    ",
+									"    // Проверяем наличие структуры error",
+									"    pm.expect(response).to.have.property('error');",
+									"    pm.expect(response.error).to.include.keys(",
+									"        'status_code', ",
+									"        'error_code', ",
+									"        'reason',",
+									"        'params'",
+									"    );",
+									"    ",
+									"    // Проверяем код ошибки",
+									"    pm.expect(response.error.error_code).to.equal(\"OE0257\");",
+									"    ",
+									"    // Проверяем текст ошибки",
+									"    pm.expect(response.error.reason).to.equal(\"Not Found\");",
+									"    ",
+									"    // Проверяем соответствие HTTP статуса и статуса в теле ошибки",
+									"    pm.expect(response.error.status_code).to.equal(404);",
+									"    ",
+									"    // Проверяем, что params - пустой массив",
+									"    pm.expect(response.error.params).to.be.an('array').that.is.empty;",
+									"    ",
+									"    // Дополнительная проверка для отладки (можно закомментировать в production)",
+									"    console.log(`Код ошибки: ${response.error.error_code}, Причина: ${response.error.reason}`);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{invalid_organization_id}}/optimizations?type={{valid_type}}&status={{valid_status}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{invalid_organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "{{valid_type}}"
+								},
+								{
+									"key": "status",
+									"value": "{{valid_status}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "06_Type без Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 400\", () => pm.response.to.have.status(400));",
+									"pm.test(\"Ошибка: status обязателен\", () => {",
+									"    const { message } = pm.response.json();",
+									"    pm.expect(message).to.include(\"status is required when type is specified\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?type={{valid_type}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "{{valid_type}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "07_Limit=0",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 400\", () => pm.response.to.have.status(400));",
+									"",
+									"pm.test(\"Проверка сообщения об ошибке для limit=0\", () => {",
+									"    const response = pm.response.json();",
+									"    ",
+									"    // Проверяем наличие структуры error",
+									"    pm.expect(response).to.have.property('error');",
+									"    pm.expect(response.error).to.have.property('reason');",
+									"    ",
+									"    // Проверяем содержимое сообщения",
+									"    const errorMessage = response.error.reason;",
+									"    pm.expect(errorMessage).to.include(\"Value of \\\"limit\\\" should be between 1 and 2147483647\");",
+									"    ",
+									"    // Дополнительная проверка кода ошибки (рекомендуется)",
+									"    pm.expect(response.error.error_code).to.equal(\"OE0224\");",
+									"    ",
+									"    // Проверка параметров ошибки",
+									"    pm.expect(response.error.params).to.be.an('array');",
+									"    pm.expect(response.error.params[0]).to.equal(\"limit\");",
+									"    pm.expect(response.error.params[1]).to.equal(1);",
+									"    pm.expect(response.error.params[2]).to.equal(2147483647);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?type={{valid_type}}&status={{valid_status}}&limit=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "{{valid_type}}"
+								},
+								{
+									"key": "status",
+									"value": "{{valid_status}}"
+								},
+								{
+									"key": "limit",
+									"value": "0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "08_Invalid Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 400\", () => pm.response.to.have.status(400));",
+									"",
+									"pm.test(\"Ошибка: Невалидное значение status\", () => {",
+									"    const response = pm.response.json();",
+									"    ",
+									"    pm.expect(response).to.have.property('error');",
+									"    pm.expect(response.error.error_code).to.equal(\"OE0460\");",
+									"    pm.expect(response.error.reason).to.equal(\"Status should be active, dismissed or excluded\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?type={{valid_type}}&status={{invalid_status}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "{{valid_type}}"
+								},
+								{
+									"key": "status",
+									"value": "{{invalid_status}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "09_Invalid Overview",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 4xx\", () => pm.response.to.have.status(401));",
+									"",
+									"",
+									"pm.test(\"Ошибка: Невалидное значение overview\", () => {",
+									"    const response = pm.response.json();",
+									"    ",
+									"    pm.expect(response).to.have.property('error');",
+									"    pm.expect(response.error.error_code).to.equal(\"OE0235\");",
+									"    pm.expect(response.error.reason).to.equal(\"Unauthorized\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token_unvallid}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer invalid_token_123",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?overview=invalid",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "overview",
+									"value": "invalid"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Setup",
+			"item": [
+				{
+					"name": "00_Setup - Get Cloud Accounts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();\r",
+									"\r",
+									"// Проверяем наличие cloud_accounts\r",
+									"if (response.cloud_accounts && response.cloud_accounts.length > 0) {\r",
+									"    // Берем первый доступный аккаунт\r",
+									"    const firstAccount = response.cloud_accounts[0];\r",
+									"    \r",
+									"    // Сохраняем ID как cloud_account_id\r",
+									"    pm.environment.set(\"valid_account_id\", firstAccount.id);\r",
+									"    \r",
+									"    pm.test(\"Установлен valid_account_id\", () => {\r",
+									"        pm.expect(firstAccount.id).to.exist;\r",
+									"        pm.expect(firstAccount.id).to.be.a('string');\r",
+									"        console.log(`Установлен valid_account_id: ${firstAccount.id}`);\r",
+									"    });\r",
+									"} else {\r",
+									"    pm.test(\"Нет облачных аккаунтов\", () => {\r",
+									"        pm.expect.fail(\"Организация не имеет подключенных облачных аккаунтов\");\r",
+									"    });\r",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/cloud_accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"cloud_accounts"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "00_Setup - Get Valid Optimization Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response = pm.response.json();\r",
+									"\r",
+									"// Проверяем наличие объекта optimizations\r",
+									"if (response.optimizations && Object.keys(response.optimizations).length > 0) {\r",
+									"    // Получаем первый тип оптимизации\r",
+									"    const optimizationTypes = Object.keys(response.optimizations);\r",
+									"    const firstType = optimizationTypes[0];\r",
+									"    \r",
+									"    // Проверяем наличие saving\r",
+									"    const optimization = response.optimizations[firstType];\r",
+									"    const hasValidSaving = optimization && typeof optimization.saving === 'number';\r",
+									"    \r",
+									"    if (hasValidSaving) {\r",
+									"        pm.environment.set(\"valid_type\", firstType);\r",
+									"        pm.environment.set(\"valid_saving\", optimization.saving);\r",
+									"        \r",
+									"        pm.test(\"Установлены valid_type и valid_saving\", () => {\r",
+									"            pm.expect(firstType).to.be.a('string').and.to.not.be.empty;\r",
+									"            pm.expect(optimization.saving).to.be.a('number').and.to.be.gte(0);\r",
+									"            console.log(`Установлен valid_type: ${firstType}`);\r",
+									"        });\r",
+									"    } else {\r",
+									"        pm.test(\"Нет валидных данных в optimizations\", () => {\r",
+									"            pm.expect.fail(\"Оптимизации не содержат необходимых полей (saving/count)\");\r",
+									"        });\r",
+									"    }\r",
+									"} else {\r",
+									"    pm.test(\"Нет данных для установки переменных\", () => {\r",
+									"        pm.expect.fail(\"Ответ не содержит данных об оптимизациях. Проверьте token и organization_id.\");\r",
+									"    });\r",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authentication & Edge Cases",
+			"item": [
+				{
+					"name": "10_No Token (401)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 401\", () => pm.response.to.have.status(401));\r",
+									"\r",
+									"\r",
+									"pm.test(\"Ошибка: Проверьте токен\", () => {\r",
+									"    const response = pm.response.json();\r",
+									"    \r",
+									"    pm.expect(response).to.have.property('error');\r",
+									"    pm.expect(response.error.error_code).to.equal(\"OE0237\");\r",
+									"    pm.expect(response.error.reason).to.equal(\"This resource requires authorization\");\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "11_Non-Existent Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 200\", () => pm.response.to.have.status(200));\r",
+									"pm.test(\"Пустой массив items\", () => {\r",
+									"    const { items } = pm.response.json();\r",
+									"    pm.expect(items).to.be.an(\"array\").that.is.empty;\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?type=non_existent_type&status=active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "non_existent_type"
+								},
+								{
+									"key": "status",
+									"value": "active"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "12_Limit=1 (граничное значение)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Статус 200\", () => pm.response.to.have.status(200));\r",
+									"pm.test(\"Одна запись с max saving\", () => {\r",
+									"    const { items } = pm.response.json();\r",
+									"    pm.expect(items).to.have.lengthOf(1);\r",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/restapi/v2/organizations/{{organization_id}}/optimizations?type={{valid_type}}&status={{valid_status}}&limit=1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"restapi",
+								"v2",
+								"organizations",
+								"{{organization_id}}",
+								"optimizations"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "{{valid_type}}"
+								},
+								{
+									"key": "status",
+									"value": "{{valid_status}}"
+								},
+								{
+									"key": "limit",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"console.log(\"[Pre-request] Running test: \", request.name);",
+					"console.log(\"[Pre-request] Using org_id: \", pm.environment.get(\"organization_id\"));"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "valid_status",
+			"value": "active",
+			"type": "default"
+		}
+	]
+}
