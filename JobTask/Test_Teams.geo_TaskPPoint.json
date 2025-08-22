@@ -1,0 +1,88 @@
+{
+	"info": {
+		"_postman_id": "874b18c4-da03-43a7-9ae5-cd7bcbdbcf34",
+		"name": "Test_Teams",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "42486344"
+	},
+	"item": [
+		{
+			"name": "geoGetIStoreBUByPoint/zone",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Тест в Postman: извлечение ZoneRecId из ответа\r",
+							"\r",
+							"pm.test(\"Проверка статуса 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"// Парсим JSON-ответ\r",
+							"const response = pm.response.json();\r",
+							"\r",
+							"// === Извлечение ZoneRecId ===\r",
+							"let zoneRecId = null;\r",
+							"\r",
+							"// Вариант 1: если ZoneRecId в корне\r",
+							"if (response.ZoneRecId) {\r",
+							"    zoneRecId = response.ZoneRecId;\r",
+							"}\r",
+							"// Вариант 2: если внутри объекта data\r",
+							"else if (response.data && response.data.ZoneRecId) {\r",
+							"    zoneRecId = response.data.ZoneRecId;\r",
+							"}\r",
+							"\r",
+							"// Проверка, найдено ли значение\r",
+							"if (zoneRecId) {\r",
+							"    console.log(\"✅ ZoneRecId:\", zoneRecId);\r",
+							"    pm.environment.set(\"ZoneRecId\", zoneRecId); // Сохраняем в переменную окружения\r",
+							"} else {\r",
+							"    console.log(\"❌ Поле ZoneRecId не найдено в ответе\");\r",
+							"    console.log(\"Полный ответ:\", response);\r",
+							"    pm.test(\"ZoneRecId присутствует в ответе\", () => {\r",
+							"        pm.expect(zoneRecId).to.not.be.null;\r",
+							"    });\r",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"RequestSource\": \"ISTORE\",\n    \"RequestUID\": \"1\",\n    \"point\": {\n        \"latitude\": 56.326797,\n        \"longitude\": 44.006516\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.hoff.ru/geoGetIStoreBUByPoint/zone",
+					"protocol": "https",
+					"host": [
+						"api",
+						"hoff",
+						"ru"
+					],
+					"path": [
+						"geoGetIStoreBUByPoint",
+						"zone"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
